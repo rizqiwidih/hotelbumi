@@ -252,7 +252,15 @@
     }
 
     var heroTitle = app.hero_text || gen.hotel_name || 'Bumi Surabaya City Resort';
-    setText($('#bs-hotel-name'), heroTitle);
+    var heroTitleEl = $('#bs-hotel-name');
+    if (heroTitleEl) {
+      var heroParts = String(heroTitle).match(/^(Welcome to)\s+(Bumi Surabaya[\s\S]*)$/i);
+      if (heroParts) {
+        heroTitleEl.innerHTML = escapeHtml(heroParts[1]) + '<br>' + escapeHtml(heroParts[2]);
+      } else {
+        setText(heroTitleEl, heroTitle);
+      }
+    }
     setText($('#bs-subtitle'), app.hero_subtitle || '');
     setText($('#bs-scroll-hint-text'), gc.hero_scroll_hint || 'Scroll to explore');
 
