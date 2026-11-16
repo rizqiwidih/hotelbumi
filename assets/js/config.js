@@ -430,8 +430,10 @@
   var _activeConfig = null;
   var _activeSources = [];
 
-  /** Umur cache konfigurasi publik — samakan dengan PUBLIC_CONFIG_CACHE_TTL backend (FR-V64-01). */
-  var CONFIG_CACHE_TTL_MS = 5 * 60 * 1000;
+  /** Umur cache konfigurasi publik di sisi tamu. Singkat saja (30 detik) agar
+   *  perubahan admin cepat terlihat; cache server tetap 5 menit tetapi selalu
+   *  dibatalkan backend setiap ada penyimpanan dari panel admin. */
+  var CONFIG_CACHE_TTL_MS = 30 * 1000;
 
   /**
    * BUG-33: backend kini hanya mengirim daftar sales + satu sumber yang sedang
