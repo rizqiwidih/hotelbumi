@@ -94,7 +94,7 @@
       promos_section_title:     'Penawaran Eksklusif',
       promos_section_subtitle:  'Sajian kuliner pilihan dan momen spesial yang dirancang khusus untuk Anda.',
       promos_card_cta_label:    'Selengkapnya →',
-      promos_wa_template:       'Halo Bumi Surabaya, saya tertarik dengan promo: {promo_name} di {outlet_name}. Mohon informasi reservasinya.',
+      promos_wa_template:       'Halo Bumi Surabaya, saya tertarik dengan promo: {promo_name} di {outlet_name} ({price}). Mohon informasi reservasinya.',
 
       wa_status_pill:           'Concierge Online',
       wa_section_title:         'Reservasi & Informasi Layanan',
@@ -153,6 +153,9 @@
       ],
       privacy_subtext:          'Dengan menggunakan layanan ini, Anda membantu kami membangun standar perhotelan bintang lima yang lebih transparan dan tepercaya.',
       privacy_btn_label:        'Saya Mengerti'
+    },
+    whatsapp_settings: {
+      template_general: 'Halo Bumi Surabaya, saya ingin informasi mengenai reservasi dan layanan hotel.'
     }
   };
 
@@ -230,7 +233,7 @@
     whatsapp_settings: {
       number:           '628113388523',
       template_staff:   'Halo, saya tamu Bumi Surabaya. Saya baru saja dilayani oleh {staff_name} dan ingin melakukan reservasi.',
-      template_general: 'Halo Bumi Surabaya, saya ingin informasi mengenai reservasi dan layanan hotel.'
+      template_general: 'Hello Bumi Surabaya, I would like information about hotel reservations and services.'
     },
     guest_content: {
       loading_title:            'Bumi Surabaya City Resort',
@@ -260,7 +263,7 @@
       promos_section_title:     'Exclusive Offers',
       promos_section_subtitle:  'Handpicked culinary experiences and special moments, just for you.',
       promos_card_cta_label:    'Discover More →',
-      promos_wa_template:       'Hello Bumi Surabaya, I am interested in the promotion: {promo_name} at {outlet_name}. Please share reservation details.',
+      promos_wa_template:       'Hello Bumi Surabaya, I am interested in the promotion: {promo_name} at {outlet_name} ({price}). Please share reservation details.',
 
       wa_status_pill:           'Concierge Online',
       wa_section_title:         'Reservations & Inquiries',
