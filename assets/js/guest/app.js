@@ -478,7 +478,7 @@
       if (p.cta_url && sanitizeUrl(p.cta_url) !== '#') {
         ctaHtml = '<a href="' + escapeHtml(sanitizeUrl(p.cta_url)) + '" target="_blank" rel="noopener noreferrer" class="bs-btn bs-btn-gold bs-btn-sm bs-promo-action-btn" data-promo-id="' + pId + '" aria-label="' + ctaLabel + ' - ' + pName + '">' + ctaLabel + '</a>';
       } else {
-        ctaHtml = '<button type="button" class="bs-btn bs-btn-gold bs-btn-sm bs-promo-action-btn" data-promo-id="' + pId + '" data-open-picker="1" data-promo-name="' + pName + '" data-promo-outlet="' + pOutlet + '" data-promo-price="' + pPrice + '" data-promo-desc="' + pDesc + '" aria-label="' + ctaLabel + ' - ' + pName + '">' + ctaLabel + '</button>';
+        ctaHtml = '<button type="button" class="bs-btn bs-btn-gold bs-btn-sm bs-promo-action-btn" data-promo-id="' + pId + '" data-open-picker="1" data-promo-name="' + pName + '" data-promo-outlet="' + pOutlet + '" data-promo-price="' + pPrice + '" aria-label="' + ctaLabel + ' - ' + pName + '">' + ctaLabel + '</button>';
       }
 
       return '<div class="bs-promo-card" data-promo-id="' + pId + '">' +
@@ -505,7 +505,7 @@
           BSTracker.track('promotion_click', { promo_id: promoId });
         }
         if (btn.getAttribute('data-open-picker')) {
-          openWaPicker({ type: 'promo', name: btn.getAttribute('data-promo-name') || '', outlet: btn.getAttribute('data-promo-outlet') || '', price: btn.getAttribute('data-promo-price') || '', desc: btn.getAttribute('data-promo-desc') || '' });
+          openWaPicker({ type: 'promo', name: btn.getAttribute('data-promo-name') || '', outlet: btn.getAttribute('data-promo-outlet') || '', price: btn.getAttribute('data-promo-price') || '' });
         }
       });
     });
@@ -560,7 +560,7 @@
       if (linkUrl) {
         ctaHtml = '<a href="' + escapeHtml(linkUrl) + '" target="_blank" rel="noopener noreferrer" class="bs-outlet-action-btn" data-outlet-id="' + oId + '" aria-label="Explore outlet and reservations ' + oName + '">' + escapeHtml(o.cta_label || outletCtaLbl) + '</a>';
       } else {
-        ctaHtml = '<button type="button" class="bs-outlet-action-btn" data-outlet-id="' + oId + '" data-open-picker="1" data-outlet-name="' + oName + '" data-outlet-desc="' + oDesc + '" aria-label="Explore outlet and reservations ' + oName + '">' + escapeHtml(o.cta_label || outletCtaLbl) + '</button>';
+        ctaHtml = '<button type="button" class="bs-outlet-action-btn" data-outlet-id="' + oId + '" data-open-picker="1" data-outlet-name="' + oName + '" aria-label="Explore outlet and reservations ' + oName + '">' + escapeHtml(o.cta_label || outletCtaLbl) + '</button>';
       }
 
       return '<div class="bs-outlet-card" data-outlet-id="' + oId + '">' +
@@ -592,7 +592,7 @@
           BSTracker.track('outlet_click', { outlet_id: outletId });
         }
         if (link.getAttribute('data-open-picker')) {
-          openWaPicker({ type: 'outlet', name: link.getAttribute('data-outlet-name') || '', desc: link.getAttribute('data-outlet-desc') || '' });
+          openWaPicker({ type: 'outlet', name: link.getAttribute('data-outlet-name') || '' });
         }
       });
     });
@@ -972,27 +972,19 @@
     var ws  = getMergedSection('whatsapp_settings');
     var ctx = _waPickerContext;
     if (ctx && ctx.type === 'outlet') {
-      var otpl = gc.outlets_wa_template || 'Hello Bumi Surabaya, I would like the menu and table reservation info at {outlet_name}. {description}';
+      var otpl = gc.outlets_wa_template || 'Hello Bumi Surabaya, I would like the menu and table reservation info at {outlet_name}.';
       return otpl.replace(/\{outlet_name\}/g, ctx.name || '')
                  .replace(/\{outlet\}/g, ctx.name || '')
-                 .replace(/\{description\}/g, ctx.desc || '')
-                 .replace(/\{staff_name\}/g, s.name || '')
-                 .replace(/\s{2,}/g, ' ')
-                 .replace(/\s+\./g, '.')
-                 .trim();
+                 .replace(/\{staff_name\}/g, s.name || '');
     }
     if (ctx && ctx.type === 'promo') {
-      var ptpl = gc.promos_wa_template || 'Hello Bumi Surabaya, I am interested in the promotion: {promo_name} at {outlet_name} ({price}). {description} Please share reservation details.';
+      var ptpl = gc.promos_wa_template || 'Hello Bumi Surabaya, I am interested in the promotion: {promo_name} at {outlet_name} ({price}). Please share reservation details.';
       return ptpl.replace(/\{promo_name\}/g, ctx.name || '')
                  .replace(/\{outlet_name\}/g, ctx.outlet || '')
                  .replace(/\{outlet\}/g, ctx.outlet || '')
                  .replace(/\{price\}/g, ctx.price || '')
-                 .replace(/\{description\}/g, ctx.desc || '')
                  .replace(/\{staff_name\}/g, s.name || '')
-                 .replace(/\s*\(\s*\)/g, '')
-                 .replace(/\s{2,}/g, ' ')
-                 .replace(/\s+\./g, '.')
-                 .trim();
+                 .replace(/\s*\(\s*\)/g, '');
     }
     var tplGeneral = (ws && ws.template_general) || 'Hello Bumi Surabaya, I would like information about hotel reservations and services.';
     return (s.welcome_template || tplGeneral).replace(/\{staff_name\}/g, s.name || '');
