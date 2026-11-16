@@ -457,9 +457,7 @@
 
     if (!active.length) { if (section) hide(section); return; }
 
-    var defaultWaNum = cleanPhone((ws && ws.number) || gen.whatsapp || '628113388523');
     var defaultCta   = gc.promos_card_cta_label || 'Discover More →';
-    var promoWaTpl   = gc.promos_wa_template    || 'Hello Bumi Surabaya, I am interested in the promotion: {promo_name} at {outlet_name}. Please share reservation details.';
 
     var html = active.map(function(p) {
       var pId = escapeHtml(p.id || '');
@@ -475,17 +473,13 @@
         ? '<img src="' + escapeHtml(safeImg) + '" alt="' + pName + '" loading="lazy" data-fallback-img="1"><div class="bs-promo-img-placeholder" hidden>' + pEmoji + '</div>'
         : '<div class="bs-promo-img-placeholder">' + pEmoji + '</div>';
 
-      var targetUrl = '';
-      if (p.cta_url && sanitizeUrl(p.cta_url) !== '#') {
-        targetUrl = sanitizeUrl(p.cta_url);
-      } else {
-        var promoMsg = promoWaTpl
-          .replace(/\{promo_name\}/g, p.name || 'Special Offer')
-          .replace(/\{outlet_name\}/g, p.outlet || 'Bumi Surabaya')
-          .replace(/\{outlet\}/g, p.outlet || 'Bumi Surabaya');
-        targetUrl = 'https://wa.me/' + defaultWaNum + '?text=' + encodeURIComponent(promoMsg);
-      }
       var ctaLabel = escapeHtml(p.cta_label || defaultCta);
+      var ctaHtml;
+      if (p.cta_url && sanitizeUrl(p.cta_url) !== '#') {
+        ctaHtml = '<a href="' + escapeHtml(sanitizeUrl(p.cta_url)) + '" target="_blank" rel="noopener noreferrer" class="bs-btn bs-btn-gold bs-btn-sm bs-promo-action-btn" data-promo-id="' + pId + '" aria-label="' + ctaLabel + ' - ' + pName + '">' + ctaLabel + '</a>';
+      } else {
+        ctaHtml = '<button type="button" class="bs-btn bs-btn-gold bs-btn-sm bs-promo-action-btn" data-promo-id="' + pId + '" data-open-picker="1" aria-label="' + ctaLabel + ' - ' + pName + '">' + ctaLabel + '</button>';
+      }
 
       return '<div class="bs-promo-card" data-promo-id="' + pId + '">' +
         '<div class="bs-promo-img-wrap">' + imgHtml + '</div>' +
@@ -496,9 +490,7 @@
           (pPrice ? '<div class="bs-promo-price">' + pPrice + '</div>' : '') +
           (pPeriod ? '<div class="bs-promo-period"><span class="bs-period-icon">🗓️</span> ' + pPeriod + '</div>' : '') +
           '<div class="bs-promo-footer">' +
-            '<a href="' + escapeHtml(targetUrl) + '" target="_blank" rel="noopener noreferrer" class="bs-btn bs-btn-gold bs-btn-sm bs-promo-action-btn" data-promo-id="' + pId + '" aria-label="' + ctaLabel + ' - ' + pName + '">' +
-              ctaLabel +
-            '</a>' +
+            ctaHtml +
           '</div>' +
         '</div>' +
       '</div>';
@@ -512,6 +504,7 @@
         if (window.BSTracker) {
           BSTracker.track('promotion_click', { promo_id: promoId });
         }
+        if (btn.getAttribute('data-open-picker')) openWaPicker();
       });
     });
 
@@ -539,9 +532,7 @@
 
     if (!activeOutlets.length) { if (section) hide(section); return; }
 
-    var defaultWaNum = cleanPhone((ws && ws.number) || gen.whatsapp || '628113388523');
     var outletCtaLbl = gc.outlets_card_cta_label || 'Explore & Reserve →';
-    var outletWaTpl  = gc.outlets_wa_template    || 'Hello Bumi Surabaya, I would like the menu and table reservation info at {outlet_name}.';
 
     var html = activeOutlets.map(function(o) {
       var oId = escapeHtml(o.id || '');
@@ -557,17 +548,17 @@
         ? '<img src="' + escapeHtml(safeImg) + '" alt="' + oName + '" loading="lazy" data-fallback-img="1"><div class="bs-outlet-img-placeholder" hidden>' + oEmoji + '</div>'
         : '<div class="bs-outlet-img-placeholder">' + oEmoji + '</div>';
 
-      var targetUrl = '';
+      var linkUrl = '';
       if (o.reservation_url && sanitizeUrl(o.reservation_url) !== '#') {
-        targetUrl = sanitizeUrl(o.reservation_url);
+        linkUrl = sanitizeUrl(o.reservation_url);
       } else if (o.url && sanitizeUrl(o.url) !== '#') {
-        targetUrl = sanitizeUrl(o.url);
+        linkUrl = sanitizeUrl(o.url);
+      }
+      var ctaHtml;
+      if (linkUrl) {
+        ctaHtml = '<a href="' + escapeHtml(linkUrl) + '" target="_blank" rel="noopener noreferrer" class="bs-outlet-action-btn" data-outlet-id="' + oId + '" aria-label="Explore outlet and reservations ' + oName + '">' + escapeHtml(o.cta_label || outletCtaLbl) + '</a>';
       } else {
-        var outletWa = cleanPhone(o.whatsapp) || defaultWaNum;
-        var outletMsg = outletWaTpl
-          .replace(/\{outlet_name\}/g, o.name || 'the restaurant')
-          .replace(/\{outlet\}/g, o.name || 'the restaurant');
-        targetUrl = 'https://wa.me/' + outletWa + '?text=' + encodeURIComponent(outletMsg);
+        ctaHtml = '<button type="button" class="bs-outlet-action-btn" data-outlet-id="' + oId + '" data-open-picker="1" aria-label="Explore outlet and reservations ' + oName + '">' + escapeHtml(o.cta_label || outletCtaLbl) + '</button>';
       }
 
       return '<div class="bs-outlet-card" data-outlet-id="' + oId + '">' +
@@ -584,9 +575,7 @@
           '<p class="bs-outlet-desc">' + oDesc + '</p>' +
           (oHours ? '<div class="bs-outlet-hours"><span class="bs-time-icon">🕒</span> ' + oHours + '</div>' : '') +
           '<div class="bs-outlet-footer">' +
-            '<a href="' + escapeHtml(targetUrl) + '" target="_blank" rel="noopener noreferrer" class="bs-outlet-action-btn" data-outlet-id="' + oId + '" aria-label="Explore outlet and reservations ' + oName + '">' +
-              escapeHtml(o.cta_label || outletCtaLbl) +
-            '</a>' +
+            ctaHtml +
           '</div>' +
         '</div>' +
       '</div>';
@@ -600,6 +589,7 @@
         if (window.BSTracker) {
           BSTracker.track('outlet_click', { outlet_id: outletId });
         }
+        if (link.getAttribute('data-open-picker')) openWaPicker();
       });
     });
 

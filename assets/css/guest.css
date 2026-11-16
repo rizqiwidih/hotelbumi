@@ -371,6 +371,8 @@ body:has(#bs-mobile-bar:not(.bs-hidden)) .bs-offline-bar { bottom: 62px; }
   font-size: 0.82rem; font-weight: 600;
   color: var(--deep-green);
   text-decoration: none;
+  background: none; border-top: none; border-left: none; border-right: none;
+  font-family: inherit; cursor: pointer; text-align: left;
   border-bottom: 1.5px solid var(--champagne-gold);
   min-height: 44px; padding-bottom: 2px; /* FR-V67-11 tap target */
   transition: color 0.2s ease;
