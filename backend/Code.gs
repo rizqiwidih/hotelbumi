@@ -1516,7 +1516,7 @@ function _handleUploadImage(data, session) {
     return _jsonOut({ ok: false, error: 'Gagal menyimpan gambar ke Drive.' });
   }
 
-  var url = 'https://drive.google.com/uc?export=view&id=' + file.getId();
+  var url = 'https://drive.google.com/thumbnail?id=' + file.getId() + '&sz=w1600';
   _recordAudit(session.username, role, 'UPLOAD_IMAGE', 'file:' + fileName, 'SUCCESS',
     'Gambar ' + Math.round(bytes.length / 1024) + ' KB diunggah', '');
   return _jsonOut({ ok: true, url: url, file_id: file.getId(), name: fileName });
