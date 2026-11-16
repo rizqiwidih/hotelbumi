@@ -478,7 +478,7 @@
       if (p.cta_url && sanitizeUrl(p.cta_url) !== '#') {
         ctaHtml = '<a href="' + escapeHtml(sanitizeUrl(p.cta_url)) + '" target="_blank" rel="noopener noreferrer" class="bs-btn bs-btn-gold bs-btn-sm bs-promo-action-btn" data-promo-id="' + pId + '" aria-label="' + ctaLabel + ' - ' + pName + '">' + ctaLabel + '</a>';
       } else {
-        ctaHtml = '<button type="button" class="bs-btn bs-btn-gold bs-btn-sm bs-promo-action-btn" data-promo-id="' + pId + '" data-open-picker="1" aria-label="' + ctaLabel + ' - ' + pName + '">' + ctaLabel + '</button>';
+        ctaHtml = '<button type="button" class="bs-btn bs-btn-gold bs-btn-sm bs-promo-action-btn" data-promo-id="' + pId + '" data-open-picker="1" data-promo-name="' + pName + '" data-promo-outlet="' + pOutlet + '" data-promo-price="' + pPrice + '" data-promo-desc="' + pDesc + '" aria-label="' + ctaLabel + ' - ' + pName + '">' + ctaLabel + '</button>';
       }
 
       return '<div class="bs-promo-card" data-promo-id="' + pId + '">' +
@@ -504,7 +504,9 @@
         if (window.BSTracker) {
           BSTracker.track('promotion_click', { promo_id: promoId });
         }
-        if (btn.getAttribute('data-open-picker')) openWaPicker();
+        if (btn.getAttribute('data-open-picker')) {
+          openWaPicker({ type: 'promo', name: btn.getAttribute('data-promo-name') || '', outlet: btn.getAttribute('data-promo-outlet') || '', price: btn.getAttribute('data-promo-price') || '', desc: btn.getAttribute('data-promo-desc') || '' });
+        }
       });
     });
 
@@ -558,7 +560,7 @@
       if (linkUrl) {
         ctaHtml = '<a href="' + escapeHtml(linkUrl) + '" target="_blank" rel="noopener noreferrer" class="bs-outlet-action-btn" data-outlet-id="' + oId + '" aria-label="Explore outlet and reservations ' + oName + '">' + escapeHtml(o.cta_label || outletCtaLbl) + '</a>';
       } else {
-        ctaHtml = '<button type="button" class="bs-outlet-action-btn" data-outlet-id="' + oId + '" data-open-picker="1" aria-label="Explore outlet and reservations ' + oName + '">' + escapeHtml(o.cta_label || outletCtaLbl) + '</button>';
+        ctaHtml = '<button type="button" class="bs-outlet-action-btn" data-outlet-id="' + oId + '" data-open-picker="1" data-outlet-name="' + oName + '" data-outlet-desc="' + oDesc + '" aria-label="Explore outlet and reservations ' + oName + '">' + escapeHtml(o.cta_label || outletCtaLbl) + '</button>';
       }
 
       return '<div class="bs-outlet-card" data-outlet-id="' + oId + '">' +
@@ -589,7 +591,9 @@
         if (window.BSTracker) {
           BSTracker.track('outlet_click', { outlet_id: outletId });
         }
-        if (link.getAttribute('data-open-picker')) openWaPicker();
+        if (link.getAttribute('data-open-picker')) {
+          openWaPicker({ type: 'outlet', name: link.getAttribute('data-outlet-name') || '', desc: link.getAttribute('data-outlet-desc') || '' });
+        }
       });
     });
 
@@ -961,6 +965,39 @@
     return { num: num, msg: msg };
   }
 
+  var _waPickerContext = null;
+
+  function pickerMessage(s) {
+    var gc  = getMergedSection('guest_content');
+    var ws  = getMergedSection('whatsapp_settings');
+    var ctx = _waPickerContext;
+    if (ctx && ctx.type === 'outlet') {
+      var otpl = gc.outlets_wa_template || 'Hello Bumi Surabaya, I would like the menu and table reservation info at {outlet_name}. {description}';
+      return otpl.replace(/\{outlet_name\}/g, ctx.name || '')
+                 .replace(/\{outlet\}/g, ctx.name || '')
+                 .replace(/\{description\}/g, ctx.desc || '')
+                 .replace(/\{staff_name\}/g, s.name || '')
+                 .replace(/\s{2,}/g, ' ')
+                 .replace(/\s+\./g, '.')
+                 .trim();
+    }
+    if (ctx && ctx.type === 'promo') {
+      var ptpl = gc.promos_wa_template || 'Hello Bumi Surabaya, I am interested in the promotion: {promo_name} at {outlet_name} ({price}). {description} Please share reservation details.';
+      return ptpl.replace(/\{promo_name\}/g, ctx.name || '')
+                 .replace(/\{outlet_name\}/g, ctx.outlet || '')
+                 .replace(/\{outlet\}/g, ctx.outlet || '')
+                 .replace(/\{price\}/g, ctx.price || '')
+                 .replace(/\{description\}/g, ctx.desc || '')
+                 .replace(/\{staff_name\}/g, s.name || '')
+                 .replace(/\s*\(\s*\)/g, '')
+                 .replace(/\s{2,}/g, ' ')
+                 .replace(/\s+\./g, '.')
+                 .trim();
+    }
+    var tplGeneral = (ws && ws.template_general) || 'Hello Bumi Surabaya, I would like information about hotel reservations and services.';
+    return (s.welcome_template || tplGeneral).replace(/\{staff_name\}/g, s.name || '');
+  }
+
   function buildWaPickerList() {
     var listEl = $('#bs-wa-picker-list');
     if (!listEl) return;
@@ -972,7 +1009,7 @@
     var rowCtaLbl  = gc.wa_picker_row_cta || 'Chat';
 
     function salesRow(s) {
-      var msg = (s.welcome_template || tplGeneral).replace(/\{staff_name\}/g, s.name);
+      var msg = pickerMessage(s);
       var a = document.createElement('a');
       a.className = 'bs-wa-sales-row';
       a.href = sanitizeUrl('https://wa.me/' + s.phone + '?text=' + encodeURIComponent(msg));
@@ -1016,9 +1053,10 @@
       var p = document.createElement('p');
       p.textContent = gc.wa_picker_empty_text || 'Our sales team contacts are being updated. Meanwhile, you can reach our main reservation line below:';
       var def = waPickerDefault();
+      var fbMsg = _waPickerContext ? pickerMessage({ name: '', welcome_template: '' }) : def.msg;
       var fb = document.createElement('a');
       fb.className = 'bs-btn bs-btn-gold';
-      fb.href = sanitizeUrl('https://wa.me/' + def.num + '?text=' + encodeURIComponent(def.msg));
+      fb.href = sanitizeUrl('https://wa.me/' + def.num + '?text=' + encodeURIComponent(fbMsg));
       fb.target = '_blank';
       fb.rel = 'noopener noreferrer';
       fb.innerHTML = '<i class="fab fa-whatsapp" aria-hidden="true"></i> ' + escapeHtml(gc.wa_picker_fallback_btn || 'Chat Reservation');
@@ -1049,9 +1087,10 @@
 
   var _waPickerPreviousActive = null;
 
-  function openWaPicker() {
+  function openWaPicker(context) {
     var overlay = $('#bs-wa-picker');
     if (!overlay) return;
+    _waPickerContext = context || null;
     buildWaPickerList();
     _waPickerPreviousActive = document.activeElement;
     overlay.classList.add('active');
