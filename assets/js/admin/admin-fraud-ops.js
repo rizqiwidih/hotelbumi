@@ -10,11 +10,6 @@
   var state = BSAdmin.state;
   var $id = BSAdmin.$id || function (id) { return document.getElementById(id); };
   var esc = BSAdmin.esc || function (s) { return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); };
-  var maskIp = BSAdmin.maskIp || function (ip) {
-    var parts = String(ip || '').split('.');
-    if (parts.length === 4) { parts[2] = 'x'; parts[3] = 'x'; return parts.join('.'); }
-    return ip || '—';
-  };
   var icon = BSAdmin.icon || function () { return ''; };
 
   function reEvaluateFraud() {
@@ -87,8 +82,8 @@
     }
 
     tbody.innerHTML = flagged.slice(0, 200).map(function (ev) {
-      var mIp = maskIp(ev.ip || '');
-      var mDev = (ev.device_id || '').substring(0, 8) + '…';
+      var mIp = ev.ip || '—';
+      var mDev = ev.device_id || '—';
       var ts = ev.ts_server ? new Date(ev.ts_server).toLocaleString('id-ID') : '—';
       var flags = (ev._flags || []).join(', ');
       return '<tr>' +
@@ -113,7 +108,7 @@
     }
 
     tbody.innerHTML = state.staffDevices.map(function (dev, idx) {
-      var devSub = (dev.device_id || '').substring(0, 12) + '…';
+      var devSub = dev.device_id || '—';
       var regTs = dev.registered_at ? new Date(dev.registered_at).toLocaleString('id-ID') : '—';
       return '<tr>' +
         '<td><code style="font-size:0.75rem;" title="' + esc(dev.device_id || '') + '">' + esc(devSub) + '</code></td>' +
@@ -157,7 +152,7 @@
       BSAdmin.showToast('Device ID tidak valid.', 'error');
       return;
     }
-    if (!confirm('Daftarkan perangkat ' + deviceId.substring(0, 8) + '… sebagai HP staf untuk sumber "' + sourceCode + '"?')) return;
+    if (!confirm('Daftarkan perangkat ' + deviceId + ' sebagai HP staf untuk sumber "' + sourceCode + '"?')) return;
     var exists = state.staffDevices.some(function (d) { return d.device_id === deviceId; });
     if (exists) {
       BSAdmin.showToast('Perangkat sudah terdaftar.', 'warning');

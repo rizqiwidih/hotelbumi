@@ -1146,7 +1146,7 @@ function _handleGetFeedbackData(data, session) {
       source_name: String(r[2] || ''),
       outlet:    String(r[3] || ''),
       guest_name: String(r[4] || ''),
-      guest_wa:  _maskWa(String(r[5] || '')),
+      guest_wa:  String(r[5] || ''),
       rating:    Number(r[6]) || 0,
       message:   String(r[7] || ''),
       status:    st
