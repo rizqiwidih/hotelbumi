@@ -12,8 +12,8 @@
   var esc = BSAdmin.esc || function (s) { return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); };
   var icon = BSAdmin.icon || function () { return ''; };
 
-  var fraudPage = 0;
-  var FRAUD_PAGE_SIZE = 10;
+  var fraudPager = null;
+  var fraudStaffSet = {};
 
   function reEvaluateFraud() {
     if (!state.events || state.events.length === 0) return;
@@ -46,24 +46,27 @@
       BSDashboard.renderSourceTable(state.evalResult.sources || [], state.currentFilter);
     }
 
-    fraudPage = 0;
+    if (fraudPager) fraudPager.reset();
     renderFraudTable();
   }
 
-  function renderFraudPager(totalPages) {
-    var pager = $id('adm-fraud-pager');
-    if (!pager) return;
-    if (totalPages <= 1) { pager.innerHTML = ''; return; }
-    var prevDis = fraudPage <= 0 ? ' disabled' : '';
-    var nextDis = fraudPage >= totalPages - 1 ? ' disabled' : '';
-    pager.innerHTML =
-      '<button type="button" class="adm-btn adm-btn-sm adm-btn-secondary" data-admin-action="adminFraudPrevPage"' + prevDis + '>‹ Sebelumnya</button>' +
-      '<span style="font-size:0.82rem;color:var(--adm-text-muted,#728078);">Halaman ' + (fraudPage + 1) + ' dari ' + totalPages + '</span>' +
-      '<button type="button" class="adm-btn adm-btn-sm adm-btn-secondary" data-admin-action="adminFraudNextPage"' + nextDis + '>Berikutnya ›</button>';
+  function fraudRowHtml(ev) {
+    var mIp = ev.ip || '—';
+    var mDev = ev.device_id || '—';
+    var ts = ev.ts_server ? new Date(ev.ts_server).toLocaleString('id-ID') : '—';
+    var flags = (ev._flags || []).join(', ');
+    var actionCell = (ev.device_id && fraudStaffSet[String(ev.device_id)])
+      ? '<span class="adm-badge-ok">' + icon('shield', 13) + ' HP Staf</span>'
+      : '<button type="button" class="adm-btn adm-btn-xs adm-btn-secondary adm-btn-mutate" data-admin-action="adminMarkDevice" data-admin-arg="' + esc(JSON.stringify([ev.device_id || '', ev.source || ''])) + '">' + icon('shield', 13) + ' <span>Tandai HP Staf</span></button>';
+    return '<tr>' +
+      '<td class="bs-num" style="font-size:0.78rem;text-align:left;">' + esc(ts) + '</td>' +
+      '<td><strong>' + esc(ev.source || '—') + '</strong></td>' +
+      '<td><code style="font-size:0.75rem;">' + esc(mDev) + '</code></td>' +
+      '<td><code style="font-size:0.75rem;">' + esc(mIp) + '</code></td>' +
+      '<td><span class="adm-badge-err">' + esc(flags) + '</span></td>' +
+      '<td>' + actionCell + '</td>' +
+    '</tr>';
   }
-
-  window.adminFraudPrevPage = function () { if (fraudPage > 0) { fraudPage--; renderFraudTable(); } };
-  window.adminFraudNextPage = function () { fraudPage++; renderFraudTable(); };
 
   function renderFraudTable() {
     var tbody = $id('adm-fraud-tbody');
@@ -71,7 +74,7 @@
 
     if (!state.evalResult) {
       if (tbody) tbody.innerHTML = '<tr><td colspan="6" class="bs-empty">Muat data dashboard terlebih dahulu.</td></tr>';
-      renderFraudPager(0);
+      if (fraudPager) fraudPager.hide();
       return;
     }
 
@@ -96,11 +99,6 @@
     }
 
     if (!tbody) return;
-    if (flagged.length === 0) {
-      tbody.innerHTML = '<tr><td colspan="6" class="bs-empty">Tidak ada event mencurigakan terdeteksi. Sistem beroperasi normal.</td></tr>';
-      renderFraudPager(0);
-      return;
-    }
 
     flagged.sort(function (a, b) {
       var tb = new Date(b.ts_server || 0).getTime() || 0;
@@ -108,55 +106,53 @@
       return tb - ta;
     });
 
-    var totalPages = Math.max(1, Math.ceil(flagged.length / FRAUD_PAGE_SIZE));
-    if (fraudPage > totalPages - 1) fraudPage = totalPages - 1;
-    if (fraudPage < 0) fraudPage = 0;
-    var pageItems = flagged.slice(fraudPage * FRAUD_PAGE_SIZE, (fraudPage + 1) * FRAUD_PAGE_SIZE);
+    fraudStaffSet = {};
+    (state.staffDevices || []).forEach(function (d) { if (d && d.device_id) fraudStaffSet[String(d.device_id)] = true; });
 
-    var staffSet = {};
-    (state.staffDevices || []).forEach(function (d) { if (d && d.device_id) staffSet[String(d.device_id)] = true; });
+    if (!fraudPager) {
+      fraudPager = BSAdmin.createPagedTable({
+        key: 'fraud',
+        tbodyId: 'adm-fraud-tbody',
+        emptyHtml: '<tr><td colspan="6" class="bs-empty">Tidak ada event mencurigakan terdeteksi. Sistem beroperasi normal.</td></tr>',
+        searchPlaceholder: 'Cari sumber, device ID, IP, aturan…',
+        searchText: function (ev) {
+          return [ev.source || '', ev.device_id || '', ev.ip || '', (ev._flags || []).join(' '), ev.ts_server || ''].join(' ');
+        },
+        renderRow: fraudRowHtml
+      });
+    }
+    fraudPager.update(flagged);
+  }
 
-    tbody.innerHTML = pageItems.map(function (ev) {
-      var mIp = ev.ip || '—';
-      var mDev = ev.device_id || '—';
-      var ts = ev.ts_server ? new Date(ev.ts_server).toLocaleString('id-ID') : '—';
-      var flags = (ev._flags || []).join(', ');
-      var actionCell = (ev.device_id && staffSet[String(ev.device_id)])
-        ? '<span class="adm-badge-ok">' + icon('shield', 13) + ' HP Staf</span>'
-        : '<button type="button" class="adm-btn adm-btn-xs adm-btn-secondary adm-btn-mutate" data-admin-action="adminMarkDevice" data-admin-arg="' + esc(JSON.stringify([ev.device_id || '', ev.source || ''])) + '">' + icon('shield', 13) + ' <span>Tandai HP Staf</span></button>';
-      return '<tr>' +
-        '<td class="bs-num" style="font-size:0.78rem;text-align:left;">' + esc(ts) + '</td>' +
-        '<td><strong>' + esc(ev.source || '—') + '</strong></td>' +
-        '<td><code style="font-size:0.75rem;">' + esc(mDev) + '</code></td>' +
-        '<td><code style="font-size:0.75rem;">' + esc(mIp) + '</code></td>' +
-        '<td><span class="adm-badge-err">' + esc(flags) + '</span></td>' +
-        '<td>' + actionCell + '</td>' +
-      '</tr>';
-    }).join('');
-    renderFraudPager(totalPages);
+  var staffDevPager = null;
+
+  function staffDevRowHtml(dev) {
+    var idx = (state.staffDevices || []).indexOf(dev);
+    var regTs = dev.registered_at ? new Date(dev.registered_at).toLocaleString('id-ID') : '—';
+    return '<tr>' +
+      '<td><code style="font-size:0.75rem;" title="' + esc(dev.device_id || '') + '">' + esc(dev.device_id || '—') + '</code></td>' +
+      '<td><strong>' + esc(dev.staff_code || '—') + '</strong></td>' +
+      '<td>' + esc(dev.label || '—') + '</td>' +
+      '<td class="bs-num" style="font-size:0.78rem;text-align:left;">' + esc(regTs) + '</td>' +
+      '<td><button type="button" class="adm-btn adm-btn-xs adm-btn-danger adm-btn-mutate" data-admin-action="adminRemoveStaffDevice" data-admin-arg="' + idx + '">' + icon('trash', 13) + ' <span>Hapus</span></button></td>' +
+    '</tr>';
   }
 
   function renderStaffDevicesTable() {
     var tbody = $id('adm-staff-devices-tbody');
     if (!tbody) return;
-    if (!state.staffDevices || state.staffDevices.length === 0) {
-      tbody.innerHTML = '<tr><td colspan="5" class="bs-empty">Belum ada perangkat staf terdaftar di sistem.</td></tr>';
-      return;
+    if (!staffDevPager) {
+      staffDevPager = BSAdmin.createPagedTable({
+        key: 'staff-devices',
+        tbodyId: 'adm-staff-devices-tbody',
+        emptyHtml: '<tr><td colspan="5" class="bs-empty">Belum ada perangkat staf terdaftar di sistem.</td></tr>',
+        searchPlaceholder: 'Cari device ID, kode staf, keterangan…',
+        searchText: function (d) { return [d.device_id || '', d.staff_code || '', d.label || ''].join(' '); },
+        renderRow: staffDevRowHtml,
+        onRender: function () { if (BSAdmin.applyRoleRestrictions) BSAdmin.applyRoleRestrictions(); }
+      });
     }
-
-    tbody.innerHTML = state.staffDevices.map(function (dev, idx) {
-      var devSub = dev.device_id || '—';
-      var regTs = dev.registered_at ? new Date(dev.registered_at).toLocaleString('id-ID') : '—';
-      return '<tr>' +
-        '<td><code style="font-size:0.75rem;" title="' + esc(dev.device_id || '') + '">' + esc(devSub) + '</code></td>' +
-        '<td><strong>' + esc(dev.staff_code || '—') + '</strong></td>' +
-        '<td>' + esc(dev.label || '—') + '</td>' +
-        '<td class="bs-num" style="font-size:0.78rem;text-align:left;">' + esc(regTs) + '</td>' +
-        '<td><button type="button" class="adm-btn adm-btn-xs adm-btn-danger adm-btn-mutate" data-admin-action="adminRemoveStaffDevice" data-admin-arg="' + idx + '">' + icon('trash', 13) + ' <span>Hapus</span></button></td>' +
-      '</tr>';
-    }).join('');
-
-    BSAdmin.applyRoleRestrictions();
+    staffDevPager.update(state.staffDevices || []);
   }
 
   window.adminRemoveStaffDevice = function (idx) {
@@ -557,6 +553,40 @@
     if (rolesMap[curVal]) sel.value = curVal;
   }
 
+  var rolesPager = null;
+
+  function roleRowHtml(rk) {
+    var rolesMap = BSAdmin.getRolePermissionsMap ? BSAdmin.getRolePermissionsMap() : {};
+    var def = rolesMap[rk] || {};
+    var isSuper = (rk === 'super_admin');
+    var isBuiltin = (BUILTIN_ROLES.indexOf(rk) !== -1);
+    var modeBadge = def.can_mutate
+      ? '<span class="adm-badge-ok">Dapat Edit (CRUD)</span>'
+      : '<span class="adm-badge-warn">Hanya Baca</span>';
+    var defaultMenuLabel = MENU_SHORT_LABELS[def.default_tab] || def.default_tab || 'Dashboard';
+
+    var menuBadges = (def.allowed_tabs || []).map(function (t) {
+      return '<span class="adm-role-tag" style="margin:2px;">' + esc(MENU_SHORT_LABELS[t] || t) + '</span>';
+    }).join(' ');
+
+    var actionsHtml = isSuper
+      ? '<span style="font-size:0.74rem;color:var(--charcoal-muted);">Terkunci (Akses Penuh)</span>'
+      : '<div class="adm-action-group">' +
+          '<button type="button" class="adm-btn adm-btn-xs adm-btn-secondary adm-btn-mutate" data-admin-action="adminEditRoleMenu" data-admin-arg="' + esc(JSON.stringify([rk])) + '">' + icon('edit', 13) + ' <span>Atur Menu</span></button>' +
+          (!isBuiltin
+            ? '<button type="button" class="adm-btn adm-btn-xs adm-btn-danger adm-btn-mutate" data-admin-action="adminDeleteRole" data-admin-arg="' + esc(JSON.stringify([rk])) + '" title="Hapus Role Kustom">' + icon('trash', 13) + '</button>'
+            : '') +
+        '</div>';
+
+    return '<tr>' +
+      '<td><strong>' + esc(def.label || rk) + '</strong><br><code style="font-size:0.74rem;color:var(--charcoal-muted);">' + esc(rk) + '</code></td>' +
+      '<td>' + modeBadge + '</td>' +
+      '<td><strong>' + esc(defaultMenuLabel) + '</strong></td>' +
+      '<td style="max-width:380px;white-space:normal;">' + menuBadges + '</td>' +
+      '<td>' + actionsHtml + '</td>' +
+    '</tr>';
+  }
+
   function renderRolesTable() {
     populateUserRoleSelect();
     var tbody = $id('adm-roles-tbody');
@@ -565,36 +595,21 @@
     var rolesMap = BSAdmin.getRolePermissionsMap ? BSAdmin.getRolePermissionsMap() : {};
     var keys = Object.keys(rolesMap);
 
-    tbody.innerHTML = keys.map(function (rk) {
-      var def = rolesMap[rk];
-      var isSuper = (rk === 'super_admin');
-      var isBuiltin = (BUILTIN_ROLES.indexOf(rk) !== -1);
-      var modeBadge = def.can_mutate
-        ? '<span class="adm-badge-ok">Dapat Edit (CRUD)</span>'
-        : '<span class="adm-badge-warn">Hanya Baca</span>';
-      var defaultMenuLabel = MENU_SHORT_LABELS[def.default_tab] || def.default_tab || 'Dashboard';
-
-      var menuBadges = (def.allowed_tabs || []).map(function (t) {
-        return '<span class="adm-role-tag" style="margin:2px;">' + esc(MENU_SHORT_LABELS[t] || t) + '</span>';
-      }).join(' ');
-
-      var actionsHtml = isSuper
-        ? '<span style="font-size:0.74rem;color:var(--charcoal-muted);">Terkunci (Akses Penuh)</span>'
-        : '<div class="adm-action-group">' +
-            '<button type="button" class="adm-btn adm-btn-xs adm-btn-secondary adm-btn-mutate" data-admin-action="adminEditRoleMenu" data-admin-arg="' + esc(JSON.stringify([rk])) + '">' + icon('edit', 13) + ' <span>Atur Menu</span></button>' +
-            (!isBuiltin
-              ? '<button type="button" class="adm-btn adm-btn-xs adm-btn-danger adm-btn-mutate" data-admin-action="adminDeleteRole" data-admin-arg="' + esc(JSON.stringify([rk])) + '" title="Hapus Role Kustom">' + icon('trash', 13) + '</button>'
-              : '') +
-          '</div>';
-
-      return '<tr>' +
-        '<td><strong>' + esc(def.label || rk) + '</strong><br><code style="font-size:0.74rem;color:var(--charcoal-muted);">' + esc(rk) + '</code></td>' +
-        '<td>' + modeBadge + '</td>' +
-        '<td><strong>' + esc(defaultMenuLabel) + '</strong></td>' +
-        '<td style="max-width:380px;white-space:normal;">' + menuBadges + '</td>' +
-        '<td>' + actionsHtml + '</td>' +
-      '</tr>';
-    }).join('');
+    if (!rolesPager) {
+      rolesPager = BSAdmin.createPagedTable({
+        key: 'roles',
+        tbodyId: 'adm-roles-tbody',
+        emptyHtml: '<tr><td colspan="6" class="bs-empty">Belum ada role terdaftar.</td></tr>',
+        searchPlaceholder: 'Cari role…',
+        searchText: function (rk) {
+          var m = BSAdmin.getRolePermissionsMap ? BSAdmin.getRolePermissionsMap() : {};
+          var d = m[rk] || {};
+          return (d.label || '') + ' ' + rk;
+        },
+        renderRow: roleRowHtml
+      });
+    }
+    rolesPager.update(keys);
   }
 
   window.adminEditRoleMenu = function (roleKey) {
@@ -740,46 +755,54 @@
     });
   }
 
+  var usersPager = null;
+
+  function userRowHtml(u) {
+    var currentUsername = String(state.username || (window.BSAuth && BSAuth.getUsername()) || 'admin').toLowerCase();
+    var rolesMap = BSAdmin.getRolePermissionsMap ? BSAdmin.getRolePermissionsMap() : {};
+    var uname = String(u.username || '');
+    var isSelf = (uname.toLowerCase() === currentUsername);
+    var rDef = rolesMap[u.role] || { label: u.role };
+    var statusBadge = u.active !== false
+      ? '<span class="adm-badge-ok">Aktif</span>'
+      : '<span class="adm-badge-err">Nonaktif</span>';
+    var pwBadge = u.must_change
+      ? ' <span class="adm-badge-warn" style="font-size:0.68rem;">Wajib Ganti Sandi</span>'
+      : '';
+    var updatedStr = u.updated_at ? new Date(u.updated_at).toLocaleString('id-ID') : '—';
+
+    return '<tr>' +
+      '<td><strong>' + esc(uname) + '</strong>' + (isSelf ? ' <span class="adm-role-tag">Anda</span>' : '') + '</td>' +
+      '<td><span class="adm-role-tag">' + esc(rDef.label || u.role) + '</span> <code style="font-size:0.72rem;color:var(--charcoal-muted);">(' + esc(u.role) + ')</code></td>' +
+      '<td>' + statusBadge + pwBadge + '</td>' +
+      '<td class="bs-num" style="font-size:0.78rem;text-align:left;">' + esc(updatedStr) + '</td>' +
+      '<td>' +
+        '<div class="adm-action-group">' +
+          '<button type="button" class="adm-btn adm-btn-xs adm-btn-secondary adm-btn-mutate" data-admin-action="adminPopulateUserEdit" data-admin-arg="' + esc(JSON.stringify([uname])) + '" title="Edit Peran / Reset Sandi">' + icon('edit', 13) + ' <span>Edit</span></button>' +
+          (!isSelf
+            ? '<button type="button" class="adm-btn adm-btn-xs adm-btn-secondary adm-btn-mutate" data-admin-action="adminToggleUserActive" data-admin-arg="' + esc(JSON.stringify([uname])) + '">' + icon('power', 13) + ' <span>' + (u.active !== false ? 'Nonaktifkan' : 'Aktifkan') + '</span></button>' +
+              '<button type="button" class="adm-btn adm-btn-xs adm-btn-danger adm-btn-mutate" data-admin-action="adminDeleteUser" data-admin-arg="' + esc(JSON.stringify([uname])) + '" title="Hapus Akun">' + icon('trash', 13) + '</button>'
+            : '') +
+        '</div>' +
+      '</td>' +
+    '</tr>';
+  }
+
   function renderUsersTable() {
     var tbody = $id('adm-users-tbody');
     if (!tbody) return;
 
-    if (!state.users || state.users.length === 0) {
-      tbody.innerHTML = '<tr><td colspan="5" class="bs-empty">Belum ada akun pengguna terdaftar.</td></tr>';
-      return;
+    if (!usersPager) {
+      usersPager = BSAdmin.createPagedTable({
+        key: 'users',
+        tbodyId: 'adm-users-tbody',
+        emptyHtml: '<tr><td colspan="5" class="bs-empty">Belum ada akun pengguna terdaftar.</td></tr>',
+        searchPlaceholder: 'Cari username atau role…',
+        searchText: function (u) { return (u.username || '') + ' ' + (u.role || ''); },
+        renderRow: userRowHtml
+      });
     }
-
-    var currentUsername = String(state.username || (window.BSAuth && BSAuth.getUsername()) || 'admin').toLowerCase();
-    var rolesMap = BSAdmin.getRolePermissionsMap ? BSAdmin.getRolePermissionsMap() : {};
-
-    tbody.innerHTML = state.users.map(function (u) {
-      var uname = String(u.username || '');
-      var isSelf = (uname.toLowerCase() === currentUsername);
-      var rDef = rolesMap[u.role] || { label: u.role };
-      var statusBadge = u.active !== false
-        ? '<span class="adm-badge-ok">Aktif</span>'
-        : '<span class="adm-badge-err">Nonaktif</span>';
-      var pwBadge = u.must_change
-        ? ' <span class="adm-badge-warn" style="font-size:0.68rem;">Wajib Ganti Sandi</span>'
-        : '';
-      var updatedStr = u.updated_at ? new Date(u.updated_at).toLocaleString('id-ID') : '—';
-
-      return '<tr>' +
-        '<td><strong>' + esc(uname) + '</strong>' + (isSelf ? ' <span class="adm-role-tag">Anda</span>' : '') + '</td>' +
-        '<td><span class="adm-role-tag">' + esc(rDef.label || u.role) + '</span> <code style="font-size:0.72rem;color:var(--charcoal-muted);">(' + esc(u.role) + ')</code></td>' +
-        '<td>' + statusBadge + pwBadge + '</td>' +
-        '<td class="bs-num" style="font-size:0.78rem;text-align:left;">' + esc(updatedStr) + '</td>' +
-        '<td>' +
-          '<div class="adm-action-group">' +
-            '<button type="button" class="adm-btn adm-btn-xs adm-btn-secondary adm-btn-mutate" data-admin-action="adminPopulateUserEdit" data-admin-arg="' + esc(JSON.stringify([uname])) + '" title="Edit Peran / Reset Sandi">' + icon('edit', 13) + ' <span>Edit</span></button>' +
-            (!isSelf
-              ? '<button type="button" class="adm-btn adm-btn-xs adm-btn-secondary adm-btn-mutate" data-admin-action="adminToggleUserActive" data-admin-arg="' + esc(JSON.stringify([uname])) + '">' + icon('power', 13) + ' <span>' + (u.active !== false ? 'Nonaktifkan' : 'Aktifkan') + '</span></button>' +
-                '<button type="button" class="adm-btn adm-btn-xs adm-btn-danger adm-btn-mutate" data-admin-action="adminDeleteUser" data-admin-arg="' + esc(JSON.stringify([uname])) + '" title="Hapus Akun">' + icon('trash', 13) + '</button>'
-              : '') +
-          '</div>' +
-        '</td>' +
-      '</tr>';
-    }).join('');
+    usersPager.update(state.users || []);
   }
 
   window.adminPopulateUserEdit = function (username) {

@@ -70,6 +70,200 @@
   }
   BSAdmin.maskIp = maskIp;
 
+  /* ─────────────────────────────────────────────────────────────
+   * Tabel berpaginasi + pencarian untuk tabel admin non-dashboard.
+   * Pemakaian: var p = BSAdmin.createPagedTable({ key, tbodyId,
+   *   renderRow(item)->html, searchText(item)->string (opsional),
+   *   searchPlaceholder, emptyHtml, onRender });
+   * lalu p.update(items) setiap data berubah.
+   * ───────────────────────────────────────────────────────────── */
+  var _pagedTables = {};
+
+  function _loadPageSize() {
+    try {
+      var v = parseInt(localStorage.getItem('bs_adm_page_size') || '10', 10);
+      return [10, 25, 50].indexOf(v) !== -1 ? v : 10;
+    } catch (e) { return 10; }
+  }
+  function _savePageSize(v) { try { localStorage.setItem('bs_adm_page_size', String(v)); } catch (e) {} }
+
+  function _pageWindow(cur, total) {
+    if (total <= 7) { var a = []; for (var i = 0; i < total; i++) a.push(i); return a; }
+    var pages = [0];
+    if (cur > 2) pages.push('…');
+    for (var p = Math.max(1, cur - 1); p <= Math.min(total - 2, cur + 1); p++) pages.push(p);
+    if (cur < total - 3) pages.push('…');
+    pages.push(total - 1);
+    return pages;
+  }
+
+  function createPagedTable(opts) {
+    if (_pagedTables[opts.key]) return _pagedTables[opts.key];
+    var inst = { opts: opts, page: 0, query: '', items: [], built: false, toolbar: null, pager: null, searchInput: null };
+    _pagedTables[opts.key] = inst;
+    inst.update = function (items) { inst.items = Array.isArray(items) ? items : []; _renderPaged(inst); };
+    inst.reset = function () { inst.page = 0; inst.query = ''; if (inst.searchInput) inst.searchInput.value = ''; };
+    inst.hide = function () { if (inst.toolbar) inst.toolbar.style.display = 'none'; if (inst.pager) inst.pager.innerHTML = ''; };
+    return inst;
+  }
+  BSAdmin.createPagedTable = createPagedTable;
+
+  function _buildPagedChrome(inst) {
+    var tbody = document.getElementById(inst.opts.tbodyId);
+    if (!tbody) return false;
+    var table = tbody.closest ? tbody.closest('table') : null;
+    if (!table || !table.parentNode || !table.parentNode.parentNode) return false;
+    var wrap = table.parentNode;
+
+    var toolbar = document.createElement('div');
+    toolbar.style.cssText = 'display:none;gap:10px;align-items:center;flex-wrap:wrap;margin:14px 0 10px;';
+    if (inst.opts.searchText) {
+      var inp = document.createElement('input');
+      inp.type = 'search';
+      inp.className = 'adm-input';
+      inp.placeholder = inst.opts.searchPlaceholder || 'Cari…';
+      inp.style.cssText = 'flex:1;min-width:180px;';
+      inp.setAttribute('aria-label', 'Cari di tabel');
+      inp.addEventListener('input', function () {
+        inst.query = inp.value.trim().toLowerCase();
+        inst.page = 0;
+        _renderPaged(inst);
+      });
+      inst.searchInput = inp;
+      toolbar.appendChild(inp);
+    }
+    var sizeWrap = document.createElement('label');
+    sizeWrap.style.cssText = 'font-size:0.8rem;display:flex;align-items:center;gap:6px;margin-left:auto;';
+    sizeWrap.appendChild(document.createTextNode('Baris per halaman:'));
+    var sel = document.createElement('select');
+    sel.className = 'adm-input';
+    sel.style.cssText = 'width:auto;';
+    [10, 25, 50].forEach(function (n) {
+      var o = document.createElement('option');
+      o.value = String(n); o.textContent = String(n);
+      sel.appendChild(o);
+    });
+    sel.value = String(_loadPageSize());
+    sel.addEventListener('change', function () {
+      _savePageSize(parseInt(sel.value, 10) || 10);
+      inst.page = 0;
+      _renderPaged(inst);
+    });
+    sizeWrap.appendChild(sel);
+    toolbar.appendChild(sizeWrap);
+    wrap.parentNode.insertBefore(toolbar, wrap);
+    inst.toolbar = toolbar;
+
+    var pager = document.createElement('div');
+    pager.style.cssText = 'margin-top:14px;';
+    wrap.parentNode.insertBefore(pager, wrap.nextSibling);
+    inst.pager = pager;
+    inst.built = true;
+    return true;
+  }
+
+  function _renderPaged(inst) {
+    var tbody = document.getElementById(inst.opts.tbodyId);
+    if (!tbody) return;
+    if (!inst.built && !_buildPagedChrome(inst)) return;
+    var table = tbody.closest ? tbody.closest('table') : null;
+    var cols = 1;
+    if (table) { var ths = table.querySelectorAll('thead th'); if (ths.length) cols = ths.length; }
+    var items = inst.items;
+
+    if (!items.length) {
+      tbody.innerHTML = inst.opts.emptyHtml || ('<tr><td colspan="' + cols + '" class="bs-empty">Tidak ada data.</td></tr>');
+      if (inst.toolbar) inst.toolbar.style.display = 'none';
+      if (inst.pager) inst.pager.innerHTML = '';
+      if (inst.opts.onRender) inst.opts.onRender();
+      return;
+    }
+
+    var filtered = items;
+    if (inst.opts.searchText && inst.query) {
+      var q = inst.query;
+      filtered = items.filter(function (it) {
+        return String(inst.opts.searchText(it) || '').toLowerCase().indexOf(q) !== -1;
+      });
+    }
+
+    var pageSize = _loadPageSize();
+    var totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
+    if (inst.page > totalPages - 1) inst.page = totalPages - 1;
+    if (inst.page < 0) inst.page = 0;
+    var start = inst.page * pageSize;
+    var pageItems = filtered.slice(start, start + pageSize);
+
+    if (!filtered.length) {
+      tbody.innerHTML = '<tr><td colspan="' + cols + '" class="bs-empty">Tidak ada hasil untuk &quot;' + esc(inst.query) + '&quot;.</td></tr>';
+    } else {
+      tbody.innerHTML = pageItems.map(inst.opts.renderRow).join('');
+    }
+
+    if (inst.toolbar) inst.toolbar.style.display = (items.length > 10 || inst.query) ? 'flex' : 'none';
+    _renderPagedControls(inst, filtered.length, items.length, totalPages, start, pageItems.length);
+    if (inst.opts.onRender) inst.opts.onRender();
+  }
+
+  function _renderPagedControls(inst, filteredCount, totalCount, totalPages, start, shownCount) {
+    var pager = inst.pager;
+    if (!pager) return;
+    if (totalPages <= 1 && !inst.query) { pager.innerHTML = ''; return; }
+    var cur = inst.page;
+    var info = 'Menampilkan ' + (filteredCount ? (start + 1) + '–' + (start + shownCount) : '0') +
+      ' dari ' + filteredCount + (inst.query ? ' hasil (total ' + totalCount + ')' : '');
+
+    var nav = '';
+    function navBtn(label, target, title, disabled, active) {
+      return '<button type="button" class="adm-btn adm-btn-sm ' + (active ? 'adm-btn-gold' : 'adm-btn-secondary') +
+        '" data-page="' + target + '" title="' + title + '"' + (disabled ? ' disabled' : '') + '>' + label + '</button>';
+    }
+    nav += navBtn('«', 0, 'Halaman pertama', cur <= 0, false);
+    nav += navBtn('‹', cur - 1, 'Halaman sebelumnya', cur <= 0, false);
+    _pageWindow(cur, totalPages).forEach(function (p) {
+      if (p === '…') { nav += '<span style="padding:0 2px;color:var(--charcoal-muted);">…</span>'; }
+      else { nav += navBtn(String(p + 1), p, 'Halaman ' + (p + 1), false, p === cur); }
+    });
+    nav += navBtn('›', cur + 1, 'Halaman berikutnya', cur >= totalPages - 1, false);
+    nav += navBtn('»', totalPages - 1, 'Halaman terakhir', cur >= totalPages - 1, false);
+
+    var jump = '';
+    if (totalPages > 1) {
+      var optsHtml = '';
+      for (var i = 0; i < totalPages; i++) {
+        optsHtml += '<option value="' + i + '"' + (i === cur ? ' selected' : '') + '>' + (i + 1) + '</option>';
+      }
+      jump = '<label style="font-size:0.8rem;display:flex;align-items:center;gap:6px;">Ke halaman <select class="adm-input" style="width:auto;" data-jump="1">' + optsHtml + '</select></label>';
+    }
+
+    pager.innerHTML =
+      '<div style="display:flex;align-items:center;justify-content:center;gap:6px;flex-wrap:wrap;">' + nav + '</div>' +
+      '<div style="display:flex;align-items:center;justify-content:center;gap:14px;flex-wrap:wrap;margin-top:8px;">' +
+        '<span style="font-size:0.8rem;color:var(--charcoal-muted);">' + info + '</span>' + jump +
+      '</div>';
+
+    pager.querySelectorAll('[data-page]').forEach(function (b) {
+      b.addEventListener('click', function () {
+        if (b.disabled) return;
+        inst.page = parseInt(b.getAttribute('data-page'), 10) || 0;
+        _renderPaged(inst);
+        var tb = document.getElementById(inst.opts.tbodyId);
+        var tbl = tb && tb.closest ? tb.closest('table') : null;
+        if (tbl && tbl.scrollIntoView) tbl.scrollIntoView({ block: 'start' });
+      });
+    });
+    var jumpSel = pager.querySelector('[data-jump]');
+    if (jumpSel) {
+      jumpSel.addEventListener('change', function () {
+        inst.page = parseInt(jumpSel.value, 10) || 0;
+        _renderPaged(inst);
+        var tb = document.getElementById(inst.opts.tbodyId);
+        var tbl = tb && tb.closest ? tb.closest('table') : null;
+        if (tbl && tbl.scrollIntoView) tbl.scrollIntoView({ block: 'start' });
+      });
+    }
+  }
+
   var SVG_PATHS = {
     edit:     '<path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/>',
     rotate:   '<path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"/><path d="M16 16h5v5"/>',
@@ -742,7 +936,7 @@
     adminEditOutlet: 1, adminToggleOutlet: 1, adminDeleteOutlet: 1,
     adminEditPromo: 1, adminTogglePromo: 1, adminDeletePromo: 1,
     adminEditSource: 1, adminRotateSource: 1, adminDeactivate: 1, adminDeleteSource: 1,
-    adminRemoveStaffDevice: 1, adminMarkDevice: 1, adminFraudPrevPage: 1, adminFraudNextPage: 1,
+    adminRemoveStaffDevice: 1, adminMarkDevice: 1,
     adminEditRoleMenu: 1, adminDeleteRole: 1,
     adminPopulateUserEdit: 1, adminToggleUserActive: 1, adminDeleteUser: 1
   };

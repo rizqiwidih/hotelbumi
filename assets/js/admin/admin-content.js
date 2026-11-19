@@ -203,37 +203,47 @@
     saveOutletsToCloud('Gerai "' + delName + '" dihapus dan disinkronkan ke server.');
   };
 
+  var promosPager = null;
+
+  function promoRowHtml(p) {
+    var promos = BSAdmin.state.promos || [];
+    var idx = promos.indexOf(p);
+    var isAct = (p.active !== false);
+    var actBadge = isAct
+      ? '<span class="adm-badge-ok">Aktif</span>'
+      : '<span class="adm-badge-err">Nonaktif</span>';
+
+    return '<tr>' +
+      '<td><strong>' + esc(p.name) + '</strong></td>' +
+      '<td>' + esc(p.outlet || '—') + '</td>' +
+      '<td>' + esc(p.price || '—') + '</td>' +
+      '<td>' + esc(p.period || '—') + '</td>' +
+      '<td>' + actBadge + '</td>' +
+      '<td class="adm-actions">' +
+        '<button type="button" class="adm-btn adm-btn-xs adm-btn-secondary adm-btn-mutate" data-admin-action="adminEditPromo" data-admin-arg="' + idx + '">' + icon('edit', 13) + ' <span>Edit</span></button>' +
+        '<button type="button" class="adm-btn adm-btn-xs adm-btn-secondary adm-btn-mutate" data-admin-action="adminTogglePromo" data-admin-arg="' + idx + '">' + icon('power', 13) + ' <span>' + (isAct ? 'Nonaktifkan' : 'Aktifkan') + '</span></button>' +
+        '<button type="button" class="adm-btn adm-btn-xs adm-btn-danger adm-btn-mutate" data-admin-action="adminDeletePromo" data-admin-arg="' + idx + '">' + icon('trash', 13) + '</button>' +
+      '</td>' +
+    '</tr>';
+  }
+
   function renderPromos() {
     var tbody = $id('adm-promos-tbody');
     if (!tbody) return;
     var promos = BSAdmin.state.promos || [];
 
-    if (promos.length === 0) {
-      tbody.innerHTML = '<tr><td colspan="6" class="bs-empty">Belum ada promosi. Klik "+ Tambah Promosi Baru".</td></tr>';
-      return;
+    if (!promosPager) {
+      promosPager = BSAdmin.createPagedTable({
+        key: 'promos',
+        tbodyId: 'adm-promos-tbody',
+        emptyHtml: '<tr><td colspan="6" class="bs-empty">Belum ada promosi. Klik "+ Tambah Promosi Baru".</td></tr>',
+        searchPlaceholder: 'Cari promosi atau gerai…',
+        searchText: function (p) { return [p.name || '', p.outlet || '', p.price || '', p.period || ''].join(' '); },
+        renderRow: promoRowHtml,
+        onRender: function () { if (BSAdmin.applyRoleRestrictions) BSAdmin.applyRoleRestrictions(); }
+      });
     }
-
-    tbody.innerHTML = promos.map(function (p, idx) {
-      var isAct = (p.active !== false);
-      var actBadge = isAct
-        ? '<span class="adm-badge-ok">Aktif</span>'
-        : '<span class="adm-badge-err">Nonaktif</span>';
-
-      return '<tr>' +
-        '<td><strong>' + esc(p.name) + '</strong></td>' +
-        '<td>' + esc(p.outlet || '—') + '</td>' +
-        '<td>' + esc(p.price || '—') + '</td>' +
-        '<td>' + esc(p.period || '—') + '</td>' +
-        '<td>' + actBadge + '</td>' +
-        '<td class="adm-actions">' +
-          '<button type="button" class="adm-btn adm-btn-xs adm-btn-secondary adm-btn-mutate" data-admin-action="adminEditPromo" data-admin-arg="' + idx + '">' + icon('edit', 13) + ' <span>Edit</span></button>' +
-          '<button type="button" class="adm-btn adm-btn-xs adm-btn-secondary adm-btn-mutate" data-admin-action="adminTogglePromo" data-admin-arg="' + idx + '">' + icon('power', 13) + ' <span>' + (isAct ? 'Nonaktifkan' : 'Aktifkan') + '</span></button>' +
-          '<button type="button" class="adm-btn adm-btn-xs adm-btn-danger adm-btn-mutate" data-admin-action="adminDeletePromo" data-admin-arg="' + idx + '">' + icon('trash', 13) + '</button>' +
-        '</td>' +
-      '</tr>';
-    }).join('');
-
-    BSAdmin.applyRoleRestrictions && BSAdmin.applyRoleRestrictions();
+    promosPager.update(promos);
   }
 
   function openPromoModal(idx) {
@@ -369,6 +379,33 @@
     });
   }
 
+  var salesPager = null;
+
+  function salesRowHtml(s) {
+    var statusBadge = s.active
+      ? '<span class="adm-badge-ok">Aktif</span>'
+      : '<span class="adm-badge-err">Nonaktif</span>';
+    var waNum = s.whatsapp ? ('<code>' + esc(s.whatsapp) + '</code>') : '<span class="adm-badge-warn">Belum diisi</span>';
+    var tmpl  = s.welcome_template
+      ? esc(s.welcome_template)
+      : ('Halo, saya tamu Bumi Surabaya. Saya dilayani oleh ' + esc(s.name) + '.');
+    var hours = esc(s.service_hours || '08.00 – 21.00 WIB');
+
+    return '<tr>' +
+      '<td><strong>' + esc(s.outlet || s.role || 'Sales & Reservasi') + '</strong></td>' +
+      '<td>' + esc(s.name) + '</td>' +
+      '<td>' + waNum + '</td>' +
+      '<td style="font-size:0.78rem;max-width:240px;">' + tmpl + '</td>' +
+      '<td>' + hours + '</td>' +
+      '<td>' + statusBadge + '</td>' +
+      '<td class="adm-actions">' +
+        '<button type="button" class="adm-btn adm-btn-xs adm-btn-secondary adm-btn-mutate" data-admin-action="adminEditSource" data-admin-arg="' + esc(JSON.stringify([s.code])) + '">' + icon('edit', 13) + ' <span>Edit</span></button>' +
+        '<button type="button" class="adm-btn adm-btn-xs adm-btn-secondary adm-btn-mutate" data-admin-action="adminDeactivate" data-admin-arg="' + esc(JSON.stringify([s.code])) + '">' + icon('power', 13) + ' <span>' + (s.active ? 'Nonaktifkan' : 'Aktifkan') + '</span></button>' +
+        '<button type="button" class="adm-btn adm-btn-xs adm-btn-danger adm-btn-mutate" data-admin-action="adminDeleteSource" data-admin-arg="' + esc(JSON.stringify([s.code])) + '">' + icon('trash', 13) + '</button>' +
+      '</td>' +
+    '</tr>';
+  }
+
   function renderSalesWa() {
     var tbody = $id('adm-sales-wa-tbody');
     if (!tbody) return;
@@ -377,34 +414,18 @@
       return s.type === 'sales' || (s.whatsapp && s.whatsapp.length > 0);
     });
 
-    if (salesList.length === 0) {
-      tbody.innerHTML = '<tr><td colspan="7" class="bs-empty">Belum ada tim sales dengan nomor WhatsApp. Klik "+ Tambah Sales Baru".</td></tr>';
-    } else {
-      tbody.innerHTML = salesList.map(function (s) {
-        var statusBadge = s.active
-          ? '<span class="adm-badge-ok">Aktif</span>'
-          : '<span class="adm-badge-err">Nonaktif</span>';
-        var waNum = s.whatsapp ? ('<code>' + esc(s.whatsapp) + '</code>') : '<span class="adm-badge-warn">Belum diisi</span>';
-        var tmpl  = s.welcome_template
-          ? esc(s.welcome_template)
-          : ('Halo, saya tamu Bumi Surabaya. Saya dilayani oleh ' + esc(s.name) + '.');
-        var hours = esc(s.service_hours || '08.00 – 21.00 WIB');
-
-        return '<tr>' +
-          '<td><strong>' + esc(s.outlet || s.role || 'Sales & Reservasi') + '</strong></td>' +
-          '<td>' + esc(s.name) + '</td>' +
-          '<td>' + waNum + '</td>' +
-          '<td style="font-size:0.78rem;max-width:240px;">' + tmpl + '</td>' +
-          '<td>' + hours + '</td>' +
-          '<td>' + statusBadge + '</td>' +
-          '<td class="adm-actions">' +
-            '<button type="button" class="adm-btn adm-btn-xs adm-btn-secondary adm-btn-mutate" data-admin-action="adminEditSource" data-admin-arg="' + esc(JSON.stringify([s.code])) + '">' + icon('edit', 13) + ' <span>Edit</span></button>' +
-            '<button type="button" class="adm-btn adm-btn-xs adm-btn-secondary adm-btn-mutate" data-admin-action="adminDeactivate" data-admin-arg="' + esc(JSON.stringify([s.code])) + '">' + icon('power', 13) + ' <span>' + (s.active ? 'Nonaktifkan' : 'Aktifkan') + '</span></button>' +
-            '<button type="button" class="adm-btn adm-btn-xs adm-btn-danger adm-btn-mutate" data-admin-action="adminDeleteSource" data-admin-arg="' + esc(JSON.stringify([s.code])) + '">' + icon('trash', 13) + '</button>' +
-          '</td>' +
-        '</tr>';
-      }).join('');
+    if (!salesPager) {
+      salesPager = BSAdmin.createPagedTable({
+        key: 'sales-wa',
+        tbodyId: 'adm-sales-wa-tbody',
+        emptyHtml: '<tr><td colspan="7" class="bs-empty">Belum ada tim sales dengan nomor WhatsApp. Klik "+ Tambah Sales Baru".</td></tr>',
+        searchPlaceholder: 'Cari nama, gerai, nomor WA…',
+        searchText: function (s) { return [s.name || '', s.outlet || '', s.role || '', s.whatsapp || '', s.code || ''].join(' '); },
+        renderRow: salesRowHtml,
+        onRender: function () { if (BSAdmin.applyRoleRestrictions) BSAdmin.applyRoleRestrictions(); }
+      });
     }
+    salesPager.update(salesList);
 
     var waSettings = (BSAdmin.state.configData && BSAdmin.state.configData.whatsapp_settings)
       ? BSAdmin.state.configData.whatsapp_settings

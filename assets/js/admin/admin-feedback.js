@@ -21,6 +21,7 @@
   function load() {
     var tbody = $id('adm-feedback-tbody');
     var refreshBtn = $id('adm-feedback-refresh-btn');
+    if (feedbackPager) feedbackPager.hide();
 
     if (!BSAdmin.checkPermission || !BSAdmin.checkPermission('view_feedback')) {
       if (tbody) {
@@ -109,34 +110,31 @@
     return s;
   }
 
-  function renderTable() {
+  var feedbackPager = null;
+
+  function feedbackRowHtml(it) {
+    var statusBadge = it.status === 'handled'
+      ? '<span class="adm-badge-ok">Ditangani</span>'
+      : '<span class="adm-badge-warn">Belum dibaca</span>';
+    var actionBtn = it.status === 'handled'
+      ? '<span style="font-size:0.75rem;color:var(--charcoal-muted);">Selesai</span>'
+      : '<button type="button" class="adm-btn adm-btn-xs adm-btn-secondary adm-btn-mutate" data-fb-row="' + it.row + '">' + icon('check', 13) + ' <span>Tandai Selesai</span></button>';
+    return '<tr>' +
+      '<td class="bs-num" style="white-space:nowrap;text-align:left;font-size:0.78rem;">' + esc(it.timestamp) + '</td>' +
+      '<td style="white-space:nowrap;color:#b08f51;letter-spacing:1px;" title="' + it.rating + '/5">' + starText(it.rating) + '</td>' +
+      '<td style="max-width:320px;white-space:normal;">' + esc(it.message) + '</td>' +
+      '<td>' + (esc(it.guest_name) || '—') + '</td>' +
+      '<td style="font-family:monospace;font-size:0.78rem;">' + (esc(it.guest_wa) || '—') + '</td>' +
+      '<td>' + (esc(it.source_name || it.source) || '—') + '</td>' +
+      '<td>' + (esc(it.outlet) || '—') + '</td>' +
+      '<td>' + statusBadge + '</td>' +
+      '<td>' + actionBtn + '</td>' +
+      '</tr>';
+  }
+
+  function bindFeedbackRowActions() {
     var tbody = $id('adm-feedback-tbody');
     if (!tbody) return;
-    if (!items.length) {
-      tbody.innerHTML = '<tr><td colspan="9" class="bs-empty">Belum ada masukan langsung dari tamu.</td></tr>';
-      return;
-    }
-    var html = items.map(function (it) {
-      var statusBadge = it.status === 'handled'
-        ? '<span class="adm-badge-ok">Ditangani</span>'
-        : '<span class="adm-badge-warn">Belum dibaca</span>';
-      var actionBtn = it.status === 'handled'
-        ? '<span style="font-size:0.75rem;color:var(--charcoal-muted);">Selesai</span>'
-        : '<button type="button" class="adm-btn adm-btn-xs adm-btn-secondary adm-btn-mutate" data-fb-row="' + it.row + '">' + icon('check', 13) + ' <span>Tandai Selesai</span></button>';
-      return '<tr>' +
-        '<td class="bs-num" style="white-space:nowrap;text-align:left;font-size:0.78rem;">' + esc(it.timestamp) + '</td>' +
-        '<td style="white-space:nowrap;color:#b08f51;letter-spacing:1px;" title="' + it.rating + '/5">' + starText(it.rating) + '</td>' +
-        '<td style="max-width:320px;white-space:normal;">' + esc(it.message) + '</td>' +
-        '<td>' + (esc(it.guest_name) || '—') + '</td>' +
-        '<td style="font-family:monospace;font-size:0.78rem;">' + (esc(it.guest_wa) || '—') + '</td>' +
-        '<td>' + (esc(it.source_name || it.source) || '—') + '</td>' +
-        '<td>' + (esc(it.outlet) || '—') + '</td>' +
-        '<td>' + statusBadge + '</td>' +
-        '<td>' + actionBtn + '</td>' +
-        '</tr>';
-    }).join('');
-    tbody.innerHTML = html;
-
     tbody.querySelectorAll('[data-fb-row]').forEach(function (btn) {
       btn.addEventListener('click', function () {
         markHandled(parseInt(btn.getAttribute('data-fb-row'), 10), btn);
@@ -146,6 +144,25 @@
     if (BSAdmin.applyRoleRestrictions && state.userRole === 'analyst_readonly') {
       tbody.querySelectorAll('.adm-btn-mutate').forEach(function (b) { b.disabled = true; });
     }
+  }
+
+  function renderTable() {
+    var tbody = $id('adm-feedback-tbody');
+    if (!tbody) return;
+    if (!feedbackPager) {
+      feedbackPager = BSAdmin.createPagedTable({
+        key: 'feedback',
+        tbodyId: 'adm-feedback-tbody',
+        emptyHtml: '<tr><td colspan="9" class="bs-empty">Belum ada masukan langsung dari tamu.</td></tr>',
+        searchPlaceholder: 'Cari nama, nomor WA, isi masukan, gerai…',
+        searchText: function (it) {
+          return [it.guest_name || '', it.guest_wa || '', it.message || '', it.outlet || '', it.source_name || it.source || '', it.timestamp || ''].join(' ');
+        },
+        renderRow: feedbackRowHtml,
+        onRender: bindFeedbackRowActions
+      });
+    }
+    feedbackPager.update(items);
   }
 
   function markHandled(row, btn) {

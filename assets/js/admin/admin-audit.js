@@ -205,10 +205,30 @@
   /* ─────────────────────────────────────────────────────────────
    * Sesi aktif (FR-V67-14)
    * ───────────────────────────────────────────────────────────── */
+  var sessionsPager = null;
+
+  function sessionRowHtml(entry) {
+    var u = entry.user;
+    var s = entry.session;
+    var loginAt = s.login_at ? new Date(s.login_at).toLocaleString('id-ID') : '—';
+    return '<tr>' +
+      '<td><strong>' + esc(u.username) + '</strong>' + (s.current ? ' <span class="adm-badge-ok">Sesi ini</span>' : '') + '</td>' +
+      '<td><span class="adm-role-tag">' + esc(u.role || '—') + '</span></td>' +
+      '<td><code>' + esc(s.token_preview) + '…</code></td>' +
+      '<td style="font-size:0.78rem;">' + esc(loginAt) + '</td>' +
+      '<td class="adm-actions">' +
+        (s.current
+          ? '<span class="adm-field-hint">Sesi berjalan</span>'
+          : '<button type="button" class="adm-btn adm-btn-xs adm-btn-danger adm-btn-mutate" data-sess-revoke="' + esc(s.token_preview) + '" data-sess-user="' + esc(u.username) + '">Cabut</button>') +
+      '</td>' +
+    '</tr>';
+  }
+
   function loadSessions() {
     var tbody = $id('adm-sess-tbody');
     var btn = $id('adm-sess-refresh-btn');
     if (!tbody) return;
+    if (sessionsPager) sessionsPager.hide();
     if (!window.BSApi || typeof BSApi.listSessions !== 'function') {
       tbody.innerHTML = '<tr><td colspan="5" class="bs-empty">API sesi tidak tersedia.</td></tr>';
       return;
@@ -219,31 +239,28 @@
     BSApi.listSessions().then(function (resp) {
       if (!resp || !resp.ok) throw new Error((resp && resp.error) || 'Gagal memuat sesi');
       var users = resp.users || [];
-      var rows = [];
+      var entries = [];
       users.forEach(function (u) {
         var sessions = u.sessions || [];
         if (sessions.length === 0) return;
         sessions.forEach(function (s) {
-          var loginAt = s.login_at ? new Date(s.login_at).toLocaleString('id-ID') : '—';
-          rows.push('<tr>' +
-            '<td><strong>' + esc(u.username) + '</strong>' + (s.current ? ' <span class="adm-badge-ok">Sesi ini</span>' : '') + '</td>' +
-            '<td><span class="adm-role-tag">' + esc(u.role || '—') + '</span></td>' +
-            '<td><code>' + esc(s.token_preview) + '…</code></td>' +
-            '<td style="font-size:0.78rem;">' + esc(loginAt) + '</td>' +
-            '<td class="adm-actions">' +
-              (s.current
-                ? '<span class="adm-field-hint">Sesi berjalan</span>'
-                : '<button type="button" class="adm-btn adm-btn-xs adm-btn-danger adm-btn-mutate" data-sess-revoke="' + esc(s.token_preview) + '" data-sess-user="' + esc(u.username) + '">Cabut</button>') +
-            '</td>' +
-          '</tr>');
+          entries.push({ user: u, session: s });
         });
       });
 
       var countEl = $id('adm-sess-count-info');
-      if (countEl) countEl.textContent = rows.length + ' sesi aktif';
-      tbody.innerHTML = rows.length
-        ? rows.join('')
-        : '<tr><td colspan="5" class="bs-empty">Tidak ada sesi aktif saat ini.</td></tr>';
+      if (countEl) countEl.textContent = entries.length + ' sesi aktif';
+      if (!sessionsPager) {
+        sessionsPager = BSAdmin.createPagedTable({
+          key: 'sessions',
+          tbodyId: 'adm-sess-tbody',
+          emptyHtml: '<tr><td colspan="5" class="bs-empty">Tidak ada sesi aktif saat ini.</td></tr>',
+          searchPlaceholder: 'Cari username atau role…',
+          searchText: function (e) { return (e.user.username || '') + ' ' + (e.user.role || '') + ' ' + (e.session.token_preview || ''); },
+          renderRow: sessionRowHtml
+        });
+      }
+      sessionsPager.update(entries);
     }).catch(function (err) {
       tbody.innerHTML = '<tr><td colspan="5" class="bs-empty" style="color:var(--danger,#dc2626);">Gagal memuat sesi: ' + esc(err.message) + '</td></tr>';
     }).finally(function () {

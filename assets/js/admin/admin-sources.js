@@ -136,6 +136,40 @@
   /* ─────────────────────────────────────────────────────────────
    * 2. Render Tabel Sumber (dengan Filter Tipe & Pencarian Instan — FR-V65-02)
    * ───────────────────────────────────────────────────────────── */
+  var sourcesPager = null;
+
+  function sourceRowHtml(s) {
+    var reprintBadge = s.needs_reprint
+      ? '<span class="adm-badge-err" style="margin-left:4px;" title="Kode telah dirotasi, cetak ulang kartu/stiker fisik">Cetak Ulang</span>'
+      : '';
+    var kartuBadge = (s.kartu_diprogram
+      ? '<span class="adm-badge-ok">Diprogram</span>'
+      : '<span class="adm-badge-warn">Belum</span>') + reprintBadge;
+    var statusBadge = s.active
+      ? '<span class="adm-badge-ok">Aktif</span>'
+      : '<span class="adm-badge-err">Nonaktif</span>';
+    var waDisp = s.whatsapp ? ('<code style="font-size:0.76rem;">' + esc(s.whatsapp) + '</code>') : '—';
+
+    var checked = selectedSources[s.code] ? ' checked' : '';
+    return '<tr>' +
+      '<td class="adm-col-check"><input type="checkbox" class="adm-src-check" data-src-code="' + esc(s.code) + '" aria-label="Pilih sumber ' + esc(s.name) + '"' + checked + '></td>' +
+      '<td><code style="font-size:0.78rem;">' + esc(s.code) + '</code></td>' +
+      '<td><strong>' + esc(s.name) + '</strong></td>' +
+      '<td><span class="adm-role-tag">' + esc(s.type) + '</span></td>' +
+      '<td>' + esc(s.outlet || '—') + '</td>' +
+      '<td>' + esc(s.role || '—') + '</td>' +
+      '<td>' + waDisp + '</td>' +
+      '<td>' + kartuBadge + '</td>' +
+      '<td>' + statusBadge + '</td>' +
+      '<td class="adm-actions">' +
+        '<button type="button" class="adm-btn adm-btn-xs adm-btn-secondary adm-btn-mutate" title="Edit Sumber" data-admin-action="adminEditSource" data-admin-arg="' + esc(JSON.stringify([s.code])) + '">' + icon('edit', 13) + ' <span>Edit</span></button>' +
+        '<button type="button" class="adm-btn adm-btn-xs adm-btn-secondary adm-btn-mutate" title="Rotasi Kode URL" data-admin-action="adminRotateSource" data-admin-arg="' + esc(JSON.stringify([s.code])) + '">' + icon('rotate', 13) + ' <span>Rotasi</span></button>' +
+        '<button type="button" class="adm-btn adm-btn-xs adm-btn-secondary adm-btn-mutate" title="Ubah Status Aktif" data-admin-action="adminDeactivate" data-admin-arg="' + esc(JSON.stringify([s.code])) + '">' + icon('power', 13) + ' <span>' + (s.active ? 'Nonaktifkan' : 'Aktifkan') + '</span></button>' +
+        '<button type="button" class="adm-btn adm-btn-xs adm-btn-danger adm-btn-mutate" title="Hapus Sumber" data-admin-action="adminDeleteSource" data-admin-arg="' + esc(JSON.stringify([s.code])) + '">' + icon('trash', 13) + '</button>' +
+      '</td>' +
+    '</tr>';
+  }
+
   function renderSourcesTable() {
     var allSources = (window.BSStaffManager && BSStaffManager.getSources) ? BSStaffManager.getSources() : [];
     var tbody      = $id('adm-sources-tbody');
@@ -168,42 +202,20 @@
           ? 'Belum ada data sumber. Klik "+ Tambah Staf / Titik" atau "Impor CSV".'
           : 'Tidak ada sumber yang cocok dengan pencarian / filter.') +
         '</td></tr>';
+      if (sourcesPager) sourcesPager.hide();
       return;
     }
 
-    tbody.innerHTML = sources.map(function (s) {
-      var reprintBadge = s.needs_reprint
-        ? '<span class="adm-badge-err" style="margin-left:4px;" title="Kode telah dirotasi, cetak ulang kartu/stiker fisik">Cetak Ulang</span>'
-        : '';
-      var kartuBadge = (s.kartu_diprogram
-        ? '<span class="adm-badge-ok">Diprogram</span>'
-        : '<span class="adm-badge-warn">Belum</span>') + reprintBadge;
-      var statusBadge = s.active
-        ? '<span class="adm-badge-ok">Aktif</span>'
-        : '<span class="adm-badge-err">Nonaktif</span>';
-      var waDisp = s.whatsapp ? ('<code style="font-size:0.76rem;">' + esc(s.whatsapp) + '</code>') : '—';
-
-      var checked = selectedSources[s.code] ? ' checked' : '';
-      return '<tr>' +
-        '<td class="adm-col-check"><input type="checkbox" class="adm-src-check" data-src-code="' + esc(s.code) + '" aria-label="Pilih sumber ' + esc(s.name) + '"' + checked + '></td>' +
-        '<td><code style="font-size:0.78rem;">' + esc(s.code) + '</code></td>' +
-        '<td><strong>' + esc(s.name) + '</strong></td>' +
-        '<td><span class="adm-role-tag">' + esc(s.type) + '</span></td>' +
-        '<td>' + esc(s.outlet || '—') + '</td>' +
-        '<td>' + esc(s.role || '—') + '</td>' +
-        '<td>' + waDisp + '</td>' +
-        '<td>' + kartuBadge + '</td>' +
-        '<td>' + statusBadge + '</td>' +
-        '<td class="adm-actions">' +
-          '<button type="button" class="adm-btn adm-btn-xs adm-btn-secondary adm-btn-mutate" title="Edit Sumber" data-admin-action="adminEditSource" data-admin-arg="' + esc(JSON.stringify([s.code])) + '">' + icon('edit', 13) + ' <span>Edit</span></button>' +
-          '<button type="button" class="adm-btn adm-btn-xs adm-btn-secondary adm-btn-mutate" title="Rotasi Kode URL" data-admin-action="adminRotateSource" data-admin-arg="' + esc(JSON.stringify([s.code])) + '">' + icon('rotate', 13) + ' <span>Rotasi</span></button>' +
-          '<button type="button" class="adm-btn adm-btn-xs adm-btn-secondary adm-btn-mutate" title="Ubah Status Aktif" data-admin-action="adminDeactivate" data-admin-arg="' + esc(JSON.stringify([s.code])) + '">' + icon('power', 13) + ' <span>' + (s.active ? 'Nonaktifkan' : 'Aktifkan') + '</span></button>' +
-          '<button type="button" class="adm-btn adm-btn-xs adm-btn-danger adm-btn-mutate" title="Hapus Sumber" data-admin-action="adminDeleteSource" data-admin-arg="' + esc(JSON.stringify([s.code])) + '">' + icon('trash', 13) + '</button>' +
-        '</td>' +
-      '</tr>';
-    }).join('');
-
-    BSAdmin.applyRoleRestrictions && BSAdmin.applyRoleRestrictions();
+    if (!sourcesPager) {
+      sourcesPager = BSAdmin.createPagedTable({
+        key: 'sources',
+        tbodyId: 'adm-sources-tbody',
+        emptyHtml: '<tr><td colspan="10" class="bs-empty">Tidak ada sumber yang cocok dengan pencarian / filter.</td></tr>',
+        renderRow: sourceRowHtml,
+        onRender: function () { if (BSAdmin.applyRoleRestrictions) BSAdmin.applyRoleRestrictions(); }
+      });
+    }
+    sourcesPager.update(sources);
   }
 
   /* ─────────────────────────────────────────────────────────────
