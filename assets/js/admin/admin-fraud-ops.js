@@ -81,20 +81,24 @@
       return;
     }
 
+    var staffSet = {};
+    (state.staffDevices || []).forEach(function (d) { if (d && d.device_id) staffSet[String(d.device_id)] = true; });
+
     tbody.innerHTML = flagged.slice(0, 200).map(function (ev) {
       var mIp = ev.ip || '—';
       var mDev = ev.device_id || '—';
       var ts = ev.ts_server ? new Date(ev.ts_server).toLocaleString('id-ID') : '—';
       var flags = (ev._flags || []).join(', ');
+      var actionCell = (ev.device_id && staffSet[String(ev.device_id)])
+        ? '<span class="adm-badge-ok">' + icon('shield', 13) + ' HP Staf</span>'
+        : '<button type="button" class="adm-btn adm-btn-xs adm-btn-secondary adm-btn-mutate" data-admin-action="adminMarkDevice" data-admin-arg="' + esc(JSON.stringify([ev.device_id || '', ev.source || ''])) + '">' + icon('shield', 13) + ' <span>Tandai HP Staf</span></button>';
       return '<tr>' +
         '<td class="bs-num" style="font-size:0.78rem;text-align:left;">' + esc(ts) + '</td>' +
         '<td><strong>' + esc(ev.source || '—') + '</strong></td>' +
         '<td><code style="font-size:0.75rem;">' + esc(mDev) + '</code></td>' +
         '<td><code style="font-size:0.75rem;">' + esc(mIp) + '</code></td>' +
         '<td><span class="adm-badge-err">' + esc(flags) + '</span></td>' +
-        '<td>' +
-          '<button type="button" class="adm-btn adm-btn-xs adm-btn-secondary adm-btn-mutate" data-admin-action="adminMarkDevice" data-admin-arg="' + esc(JSON.stringify([ev.device_id || '', ev.source || ''])) + '">' + icon('shield', 13) + ' <span>Tandai HP Staf</span></button>' +
-        '</td>' +
+        '<td>' + actionCell + '</td>' +
       '</tr>';
     }).join('');
   }
