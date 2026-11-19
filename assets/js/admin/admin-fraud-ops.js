@@ -12,6 +12,9 @@
   var esc = BSAdmin.esc || function (s) { return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); };
   var icon = BSAdmin.icon || function () { return ''; };
 
+  var fraudPage = 0;
+  var FRAUD_PAGE_SIZE = 10;
+
   function reEvaluateFraud() {
     if (!state.events || state.events.length === 0) return;
     var eventsToEval = (BSAdmin.reports && typeof BSAdmin.reports.getFilteredEvents === 'function')
@@ -43,8 +46,24 @@
       BSDashboard.renderSourceTable(state.evalResult.sources || [], state.currentFilter);
     }
 
+    fraudPage = 0;
     renderFraudTable();
   }
+
+  function renderFraudPager(totalPages) {
+    var pager = $id('adm-fraud-pager');
+    if (!pager) return;
+    if (totalPages <= 1) { pager.innerHTML = ''; return; }
+    var prevDis = fraudPage <= 0 ? ' disabled' : '';
+    var nextDis = fraudPage >= totalPages - 1 ? ' disabled' : '';
+    pager.innerHTML =
+      '<button type="button" class="adm-btn adm-btn-sm adm-btn-secondary" data-admin-action="adminFraudPrevPage"' + prevDis + '>‹ Sebelumnya</button>' +
+      '<span style="font-size:0.82rem;color:var(--adm-text-muted,#728078);">Halaman ' + (fraudPage + 1) + ' dari ' + totalPages + '</span>' +
+      '<button type="button" class="adm-btn adm-btn-sm adm-btn-secondary" data-admin-action="adminFraudNextPage"' + nextDis + '>Berikutnya ›</button>';
+  }
+
+  window.adminFraudPrevPage = function () { if (fraudPage > 0) { fraudPage--; renderFraudTable(); } };
+  window.adminFraudNextPage = function () { fraudPage++; renderFraudTable(); };
 
   function renderFraudTable() {
     var tbody = $id('adm-fraud-tbody');
@@ -52,6 +71,7 @@
 
     if (!state.evalResult) {
       if (tbody) tbody.innerHTML = '<tr><td colspan="6" class="bs-empty">Muat data dashboard terlebih dahulu.</td></tr>';
+      renderFraudPager(0);
       return;
     }
 
@@ -78,13 +98,25 @@
     if (!tbody) return;
     if (flagged.length === 0) {
       tbody.innerHTML = '<tr><td colspan="6" class="bs-empty">Tidak ada event mencurigakan terdeteksi. Sistem beroperasi normal.</td></tr>';
+      renderFraudPager(0);
       return;
     }
+
+    flagged.sort(function (a, b) {
+      var tb = new Date(b.ts_server || 0).getTime() || 0;
+      var ta = new Date(a.ts_server || 0).getTime() || 0;
+      return tb - ta;
+    });
+
+    var totalPages = Math.max(1, Math.ceil(flagged.length / FRAUD_PAGE_SIZE));
+    if (fraudPage > totalPages - 1) fraudPage = totalPages - 1;
+    if (fraudPage < 0) fraudPage = 0;
+    var pageItems = flagged.slice(fraudPage * FRAUD_PAGE_SIZE, (fraudPage + 1) * FRAUD_PAGE_SIZE);
 
     var staffSet = {};
     (state.staffDevices || []).forEach(function (d) { if (d && d.device_id) staffSet[String(d.device_id)] = true; });
 
-    tbody.innerHTML = flagged.slice(0, 200).map(function (ev) {
+    tbody.innerHTML = pageItems.map(function (ev) {
       var mIp = ev.ip || '—';
       var mDev = ev.device_id || '—';
       var ts = ev.ts_server ? new Date(ev.ts_server).toLocaleString('id-ID') : '—';
@@ -101,6 +133,7 @@
         '<td>' + actionCell + '</td>' +
       '</tr>';
     }).join('');
+    renderFraudPager(totalPages);
   }
 
   function renderStaffDevicesTable() {

@@ -742,7 +742,7 @@
     adminEditOutlet: 1, adminToggleOutlet: 1, adminDeleteOutlet: 1,
     adminEditPromo: 1, adminTogglePromo: 1, adminDeletePromo: 1,
     adminEditSource: 1, adminRotateSource: 1, adminDeactivate: 1, adminDeleteSource: 1,
-    adminRemoveStaffDevice: 1, adminMarkDevice: 1,
+    adminRemoveStaffDevice: 1, adminMarkDevice: 1, adminFraudPrevPage: 1, adminFraudNextPage: 1,
     adminEditRoleMenu: 1, adminDeleteRole: 1,
     adminPopulateUserEdit: 1, adminToggleUserActive: 1, adminDeleteUser: 1
   };
